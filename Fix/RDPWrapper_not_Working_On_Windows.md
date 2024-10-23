@@ -18,6 +18,15 @@ The screenshot below shows that for my version of Windows 11 (10.0.22621.317) th
 [10.0.22621.317-SLInit]
 ...
 ```
+
 <div align="center">
 	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_9.jpg">
+</div>
+
+If there is no section in the rdpwrap configuration file for your version of Windows, try searching the web for the rdpwrap.ini file. Add the configuration settings you found to the end of the file.
+
+If the RDP Wrapper does not work after you install security updates or upgrade the Windows build, check that there is no ```Listener state: Not listening ``` warning in the RDPWrap Diagnostics section.
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_10.jpg">
 </div>
