@@ -30,3 +30,22 @@ If the RDP Wrapper does not work after you install security updates or upgrade t
 <div align="center">
 	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_10.jpg">
 </div>
+
+Try updating the rdpwrap.ini file, and then reinstalling the rdpwrapper service:
+```
+rdpwinst.exe -u
+```
+```
+rdpwinst.exe -i
+```
+It can happen that when you try to make a second RDP connection as a different user, you will get an error message:
+```
+The number of connections to this computer is limited and all connections are in use right now.
+Try connecting later or contact your system administrator.
+```
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_11.jpg">
+</div>
+
+
+
