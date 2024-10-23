@@ -194,3 +194,9 @@ Activate your copy of Windows 10 Enterprise Multi-Session edition on your KMS se
 slmgr /skms kms-srv.woshub.local:1688
 slmgr /ato
 ```
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_19.jpg">
+</div>
+
+Open the Local GPO Editor (```gpedit.msc```) and enable ```Per-User``` licensing mode in the ```Set the Remote Desktop licensing mode``` (Computer Configuration -> Policies -> Administrative Templates -> Windows Components -> Remote Desktop Services -> Remote Desktop Session Host -> Licensing)
