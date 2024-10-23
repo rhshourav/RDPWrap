@@ -36,3 +36,10 @@ The RDPWrap-v1.0.zip archive contains some files:
 	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_4.jpg">
 </div>
 
+
+
+To install RDPWrap, run the ```install.bat``` file as an administrator. The program is installed in the ````C:\Program Files\RDP Wrapper```` directory
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_5.jpg">
+</div>
