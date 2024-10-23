@@ -115,3 +115,5 @@ To uninstall:
 - Go to the directory where you extracted the files
 - Right-click on **`uninstall.bat`** and select Run as Administrator
 - See command output for details
+###
+## For In-depth Installtation And Troubleshooting [Click Me](https://github.com/rhshourav/RDPWrap/blob/main/install.md)
