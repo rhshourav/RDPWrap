@@ -25,3 +25,9 @@ Invoke-WebRequest https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads
 <div align="center">
 	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_8.jpg">
 </div>
+
+Now Run This Command as administrator.
+```
+net start termservice
+```
+And Reboot your PC.
