@@ -22,3 +22,6 @@ Then
 ```
 Invoke-WebRequest https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/Fix/rdpwrap.ini -outfile "C:\Program Files\RDP Wrapper\rdpwrap.ini"
 ```
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_8.jpg">
+</div>
