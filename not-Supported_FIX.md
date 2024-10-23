@@ -46,3 +46,9 @@ qwinsta
 rdp-tcp#0         user1                 1  Active
 rdp-tcp#1         user2                 2  Active
 ```
+
+##
+
+# RDP Wrapper Not Working on Windows
+If RDPWrapper not working [Click Me](https://github.com/rhshourav/RDPWrap/blob/main/Fix/RDPWrapper_not_Working_On_Windows.md)
+
