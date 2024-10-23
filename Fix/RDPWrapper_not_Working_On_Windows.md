@@ -183,4 +183,14 @@ slmgr.vbs /ipk CPWHC-NT2C7-VYW78-DHDB2-PG3GK
 	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_17.jpg">
 </div>
 
-Check that your edition of Windows 10 has now changed to ServerRdsh (Windows 10 Enterprise for Virtual Desktops).
+Check that your edition of Windows 10 has now changed to ```ServerRdsh``` (Windows 10 Enterprise for Virtual Desktops).
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_18.jpg">
+</div>
+
+Activate your copy of Windows 10 Enterprise Multi-Session edition on your KMS server:
+```
+slmgr /skms kms-srv.woshub.local:1688
+slmgr /ato
+```
