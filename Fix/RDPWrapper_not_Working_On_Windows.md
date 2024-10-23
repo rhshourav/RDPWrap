@@ -200,3 +200,20 @@ slmgr /ato
 </div>
 
 Open the Local GPO Editor (```gpedit.msc```) and enable ```Per-User``` licensing mode in the ```Set the Remote Desktop licensing mode``` (Computer Configuration -> Policies -> Administrative Templates -> Windows Components -> Remote Desktop Services -> Remote Desktop Session Host -> Licensing)
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_20.jpg">
+</div>
+
+You must restart Windows after activation. Now try connecting to the computer using RDP with different user accounts. As you can see, Windows 10 Enterprise multi-session supports simultaneous RDP connections right out of the box.
+``` Get-ComputerInfo | select WindowsProductName, WindowsVersion, OsHardwareAbstractionLayer```
+```
+Windows 10 Enterprise for Virtual Desktops 2009           10.0.19041.2728
+```
+``` qwinsta```
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_21.jpg">
+</div>
+
+###
+# IF All this doesn't fix the issue then i don't know.
