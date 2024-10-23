@@ -53,4 +53,10 @@ In this case, you can use the ```local Group Policy Editor (gpedit.msc)``` to en
 	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_12.jpg">
 </div>
 
+Restart your computer to ```update the local Group Policy``` and apply the settings.
+```
+gpupdate /force
+```
+###
+
 
