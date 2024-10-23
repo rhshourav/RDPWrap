@@ -35,3 +35,14 @@ Reboot your PC and run the ```RDPConfig.exe``` tool. Check that all items in the
 <div align="center">
 	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_6.jpg">
 </div>
+
+
+You can check that two (or more) RDP sessions are active on the computer at the same time by using the command:
+```
+qwinsta
+```
+
+```
+rdp-tcp#0         user1                 1  Active
+rdp-tcp#1         user2                 2  Active
+```
