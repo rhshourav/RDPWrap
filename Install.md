@@ -26,7 +26,7 @@ RDP Wrapper is detected as a potentially dangerous program by most antivirus sca
 
 
 
-The RDPWrap-v1.6.2.zip archive contains some files:
+The RDPWrap-v1.0.zip archive contains some files:
 -  ```RDPWinst.exe``` — used to install/uninstall an RDP wrapper library
 -  ```RDPConf.exe``` — RDP Wrapper configuration tool
 -  ```RDPCheck.exe``` — an RDP check tool (Local RDP Checker)
