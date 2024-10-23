@@ -18,3 +18,6 @@ The screenshot below shows that for my version of Windows 11 (10.0.22621.317) th
 [10.0.22621.317-SLInit]
 ...
 ```
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_9.jpg">
+</div>
