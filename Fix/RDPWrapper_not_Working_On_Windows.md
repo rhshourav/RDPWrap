@@ -47,5 +47,10 @@ Try connecting later or contact your system administrator.
 	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_11.jpg">
 </div>
 
+In this case, you can use the ```local Group Policy Editor (gpedit.msc)``` to enable the ```“Limit number of connections”```option under ```Computer Configuration -> Administrative Templates -> Windows Components -> Remote Desktop Services -> Remote Desktop Session Host -> Connections section. Increase the ‘RD maximum connection allowed’ value to 999999.```
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_12.jpg">
+</div>
 
 
