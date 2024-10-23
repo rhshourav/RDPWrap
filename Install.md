@@ -66,4 +66,4 @@ And Insatallation done. If You See ERROR  the ```red [not supported] ``` warning
 </div>
 
 
-Then [Follow This Link.](https://github.com/rhshourav/RDPWrap/blob/main/not-Supported_FIX.md)
+Then [Follow This Link.](https://github.com/rhshourav/RDPWrap/blob/main/Fix/not-Supported_FIX.md)
