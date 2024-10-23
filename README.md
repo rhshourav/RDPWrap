@@ -1,10 +1,10 @@
 # RDP Wrapper Library by Stas'M
 
 ![Environment](https://img.shields.io/badge/Windows-Vista,%207,%208,%2010-brightgreen.svg)
-[![Release](https://img.shields.io/github/rhshourav/RDPWrapperrdpwrap.svg)](https://github.com/rhshourav/RDPWrapper/releases)
+[![Release](https://img.shields.io/github/rhshourav/RDPWrapp.svg)](https://github.com/rhshourav/RDPWrap/releases)
 ![License](https://img.shields.io/github/license/rhshourav/rdpwrap.svg)
-![Downloads](https://img.shields.io/github/downloads/rhshourav/RDPWrapper/latest/total.svg)
-![TotalDownloads](https://img.shields.io/github/downloads/rhshourav/RDPWrapper/total.svg)
+![Downloads](https://img.shields.io/github/downloads/rhshourav/RDPWrap/latest/total.svg)
+![TotalDownloads](https://img.shields.io/github/downloads/rhshourav/RDPWrap/total.svg)
 
 The goal of this project is to enable Remote Desktop Host support and concurrent RDP sessions on reduced functionality systems for home usage.
 
