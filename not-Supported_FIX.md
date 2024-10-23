@@ -4,4 +4,21 @@
 
 #  ```the red [not supported] warning```
 
-###
+##
+
+Most likely, immediately after installation, the tool will show that the RDP wrapper is running (Installed, Running, Listening), but not working. Note the ```red [not supported]``` warning. It reports that this version of Windows 10 22H2 (ver. 10.0.19041.1949) is not supported by the RDPWrapper.
+
+This is because the ```rdpwrap.ini```configuration file does not contain settings for your Windows version (build). +
+
+✅ Download the latest version of ```rdpwrap.ini``` [here](https://github.com/rhshourav/RDPWrap/blob/main/Fix/rdpwrap.ini) : or
+[https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/Fix/rdpwrap.ini](https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/Fix/rdpwrap.ini)
+
+Manually copy the contents of this page into the ```C:\Program Files\RDP Wrapper\rdpwrap.ini``` file. Or download the INI file using the PowerShell cmdlet Invoke-WebRequest (you must first stop the Remote Desktop service):
+
+```
+Stop-Service termservice -Force
+```
+Then
+```
+Invoke-WebRequest https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/Fix/rdpwrap.ini -outfile "C:\Program Files\RDP Wrapper\rdpwrap.ini"
+```
