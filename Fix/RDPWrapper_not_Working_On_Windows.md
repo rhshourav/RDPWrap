@@ -59,4 +59,27 @@ gpupdate /force
 ```
 ###
 
+## Patch the Termsrv.dll to Enable Multiple Remote Desktop Sessions
 
+To remove the limit on the number of concurrent RDP user connections in Windows without using rdpwrapper, you can ```replace``` the original ```termsrv.dll``` file. This is the main library file used by the Remote Desktop Service. The file is located in the ```C:\Windows\System32``` directory.
+
+It is advisable to make a backup copy of the termsrv.dll file before editing or replacing it. This will help you to revert to the original version of the file if necessary. Open an elevated command prompt and run the command:
+
+``` copy c:\Windows\System32\termsrv.dll termsrv.dll_backup ```
+```
+SUCCESS: The file (or folder): c:\Windows\System32\termsrv.dll now owned by the administrators group
+```
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_13.jpg">
+</div>
+
+Now you need to stop the Remote Desktop service ```(TermService)``` using the ```services.msc``` console or with the command:
+```
+net stop TermService
+```
+It also stops the Remote Desktop Services UserMode Port Redirector service.
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_14.jpg">
+</div>
