@@ -174,4 +174,13 @@ Upgrade your edition of Windows 10 from Pro to Enterprise with the command:
 ```
 changepk.exe /ProductKey NPPR9-FWDCX-D2C8J-H872K-2YT43 
 ```
+Now install the GVLK key for Windows 10 Enterprise for Remote Sessions:
+```
+slmgr.vbs /ipk CPWHC-NT2C7-VYW78-DHDB2-PG3GK
+```
 
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_17.jpg">
+</div>
+
+Check that your edition of Windows 10 has now changed to ServerRdsh (Windows 10 Enterprise for Virtual Desktops).
