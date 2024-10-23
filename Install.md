@@ -55,6 +55,8 @@ Restart your computer and run the ```RDPConfig.exe``` tool. Check that all items
 </div>
 
 
+##
+
 
 And Insatallation done. If You See ERROR  the ```red [not supported] ``` warning.
 
