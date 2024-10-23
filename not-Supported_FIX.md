@@ -30,4 +30,8 @@ Now Run This Command as administrator.
 ```
 net start termservice
 ```
-And Reboot your PC.
+Reboot your PC and run the ```RDPConfig.exe``` tool. Check that all items in the Diagnostics section are green and that the ```[Fully supported]``` message is displayed. 
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_6.jpg">
+</div>
