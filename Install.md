@@ -43,3 +43,25 @@ To install RDPWrap, run the ```install.bat``` file as an administrator. The prog
 <div align="center">
 	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_5.jpg">
 </div>
+
+
+Restart your computer and run the ```RDPConfig.exe``` tool. Check that all items in the Diagnostics section are green and that the ```[Fully supported]``` message is displayed. The RDP wrapper started successfully on Windows 11 22H2 in my case.
+
+
+
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_6.jpg">
+</div>
+
+
+
+And Insatallation done. If You See ERROR  the ```red [not supported] ``` warning.
+
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_7.jpg">
+</div>
+
+
+Then [Follow This Link.](https://github.com/rhshourav/RDPWrap/blob/main/not-Supported_FIX.md)
