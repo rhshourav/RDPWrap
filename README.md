@@ -116,4 +116,4 @@ To uninstall:
 - Right-click on **`uninstall.bat`** and select Run as Administrator
 - See command output for details
 ###
-## For In-depth Installtation And Troubleshooting [Click Me](https://github.com/rhshourav/RDPWrap/blob/main/install.md)
+## For In-depth Installtation And Troubleshooting [Click Me](https://github.com/rhshourav/RDPWrap/blob/main/Install.md)
