@@ -152,3 +152,26 @@ This script was written for the Windows PowerShell version and does not work in 
 👍 The advantage of the method of enabling multiple RDP sessions in Windows 10 or 11 by replacing the termsrv.dll file is that antivirus software will not react to it (unlike RDPWrap, which is detected by many antivirus products as a malware/hack tool/trojan).
 
 👎The disadvantage of this is that you will have to manually edit the file each time you update the Windows build (or if the monthly cumulative patches update the version of termsrv.dll).
+###
+
+## Multiple Concurrent RDP Connections in Windows 10 Enterprise Multi-session
+Microsoft has recently released a special edition of the operating system called ```Windows Enterprise Multi-Session``` (Previously known as Windows 10 Enterprise for Remote Sessions and Windows 10 Enterprise for Virtual Desktops)
+
+The key feature of this edition is that it supports multiple concurrent RDP user sessions out of the box. Although the Windows multi-session edition is only allowed to be run in Azure VMs, you can install this edition on an on-premises network and use that computer as a terminal server (even though this would be against Microsoft’s licensing policies).
+
+```The Enterprise Multi-Session edition is available for both Windows 10 and Windows 11.```
+
+The Enterprise Multi-Session edition is available for both Windows 10 and Windows 11.
+
+Open a command prompt and check your current edition of Windows (Professional in this example):
+``` DISM /online /Get-CurrentEdition ```
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_16.jpg">
+</div>
+
+Upgrade your edition of Windows 10 from Pro to Enterprise with the command:
+```
+changepk.exe /ProductKey NPPR9-FWDCX-D2C8J-H872K-2YT43 
+```
+
