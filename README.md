@@ -1,4 +1,4 @@
-# RDP Wrapper Library by Stas'M
+# RDP Wrap
 
 ![Environment](https://img.shields.io/badge/Windows-Vista,%207,%208,%2010-brightgreen.svg)
 [![Release](https://img.shields.io/github/rhshourav/RDPWrapp.svg)](https://github.com/rhshourav/RDPWrap/releases)
