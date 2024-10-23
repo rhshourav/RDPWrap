@@ -120,3 +120,35 @@ Then open the termsrv.dll file using any HEX editor (for example, Tiny Hexer). D
 -----------------------------------------------------------------------------------------------------------------
  
 ```
+
+``` Tiny Hexer cannot edit termsvr.dll file directly from the system32 folder. Copy it to your desktop and replace the original file after modifying it. ```
+
+For example, my build of Windows 10 x64 is 22H2 19045.2006 (termsrv.dll file version is 10.0.19041.1949). Open the termsrv.dll file in Tiny Hexer, then find the text:
+```
+39 81 3C 06 00 00 0F 84 75 7A 01 00
+```
+and replace it with:
+```
+B8 00 01 00 00 89 81 38 06 00 00 90
+```
+
+<div align="center">
+	<img style='center' src="https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/src/img/img_15.jpg">
+</div>
+
+Save the file and start the TermService.
+
+If something goes wrong and you experience some problems with the Remote Desktop service, stop the service and replace the modified termsrv.dll file with the original version:
+
+```copy termsrv.dll_backup c:\Windows\System32\termsrv.dll```
+
+To avoid manually editing the termsrv.dll file with a HEX editor, you can use the following PowerShell script to automatically patch the termsrv.dll file. The PowerShell script code is available in my GitHub repository at the following link:
+
+[https://github.com/maxbakhub/winposh/blob/main/termsrv_rdp_patch.ps1](https://github.com/maxbakhub/winposh/blob/main/termsrv_rdp_patch.ps1)
+
+This script was written for the Windows PowerShell version and does not work in modern PowerShell Core.
+
+
+👍 The advantage of the method of enabling multiple RDP sessions in Windows 10 or 11 by replacing the termsrv.dll file is that antivirus software will not react to it (unlike RDPWrap, which is detected by many antivirus products as a malware/hack tool/trojan).
+
+👎The disadvantage of this is that you will have to manually edit the file each time you update the Windows build (or if the monthly cumulative patches update the version of termsrv.dll).
