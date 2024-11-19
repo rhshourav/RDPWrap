@@ -104,6 +104,15 @@ It's recommended to have original termsrv.dll file with the RDP Wrapper installa
 
 Installation instructions:
 - Download latest release binaries and unpack files
+    - Open Windows PowerShell & Run.
+    - For ```.msi```
+    ```
+    wget https://github.com/rhshourav/RDPWrap/releases/download/v1.0/RDPWInstall-V1.0.msi -O RDPWInstall-V1.0.msi
+    ```
+    - For ```.zip```
+    ```
+    wget https://github.com/rhshourav/RDPWrap/releases/download/v1.0/RDPWrap-V1.0.zip -O RDPWrap-V1.0.zip
+    ```
 - Right-click on **`install.bat`** and select Run as Administrator
 - See command output for details
 
