@@ -1,6 +1,6 @@
 <#
   RDP AutoLogoff (Immediate logoff on RDP disconnect)
-  Version: 1.1.0
+  Version: 1.1.2
   Author : Shourav | GitHub: github.com/rhshourav
 
   What it does:
@@ -11,6 +11,11 @@
         1) ONEVENT (EventID 24 disconnect) -> runs payload immediately
         2) ONSTART -> runs enforcer each boot (re-enforces + self-check)
     - Self-check parses task XML (robust; no fragile string matching)
+
+  Run:
+    Install   : powershell -ExecutionPolicy Bypass -File .\test.ps1
+    Check     : powershell -ExecutionPolicy Bypass -File .\test.ps1 -Mode Check
+    Uninstall : powershell -ExecutionPolicy Bypass -File .\test.ps1 -Mode Uninstall
 #>
 
 [CmdletBinding()]
@@ -18,14 +23,14 @@ param(
   [ValidateSet('Install','Check','Uninstall')]
   [string]$Mode = 'Install',
 
-  # Optional fallback for IEX installs (if script path not available)
+  # Used only if script isn't running from file path (IEX case)
   [string]$SelfUrl = "https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/AutoLogoff/RDP-AutoLogoff-FullAuto.ps1"
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$Version = '1.1.0'
+$Version = '1.1.2'
 $Author  = 'Shourav | GitHub: github.com/rhshourav'
 
 # -----------------------------
@@ -59,11 +64,36 @@ function Is-Admin {
   $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-function Run([string]$exe, [string[]]$args) {
-  $out = & $exe @args 2>&1
+function Get-SystemExePath([string]$name) {
+  $sys = Join-Path $env:windir "System32\$name"
+  $sn  = Join-Path $env:windir "Sysnative\$name"  # only works from 32-bit process on 64-bit OS
+  if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess -and (Test-Path -LiteralPath $sn)) {
+    return $sn
+  }
+  return $sys
+}
+
+# Robust native exec (no PowerShell native stderr weirdness)
+function Run-Native([string]$ExePath, [string[]]$Arguments) {
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $ExePath
+  $psi.Arguments = ($Arguments -join ' ')
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError  = $true
+  $psi.CreateNoWindow = $true
+
+  $p = New-Object System.Diagnostics.Process
+  $p.StartInfo = $psi
+  [void]$p.Start()
+  $stdout = $p.StandardOutput.ReadToEnd()
+  $stderr = $p.StandardError.ReadToEnd()
+  $p.WaitForExit()
+
   [pscustomobject]@{
-    ExitCode = $LASTEXITCODE
-    Output   = ($out | Out-String)
+    ExitCode = $p.ExitCode
+    StdOut   = $stdout
+    StdErr   = $stderr
   }
 }
 
@@ -100,21 +130,18 @@ function Get-ChannelRegPath {
 }
 
 function Ensure-ChannelEnabled {
-  $r = Run "wevtutil.exe" @("sl", $Channel, "/e:true")
-  if ($r.ExitCode -ne 0) {
-    throw "wevtutil enable failed: $($r.Output)"
-  }
+  $wevt = Get-SystemExePath "wevtutil.exe"
+  $r = Run-Native $wevt @("sl", "`"$Channel`"", "/e:true")
+  if ($r.ExitCode -ne 0) { throw "wevtutil enable failed: $($r.StdErr.Trim()) $($r.StdOut.Trim())" }
 
   $rp = Get-ChannelRegPath
-  if (-not (Test-Path -LiteralPath $rp)) {
-    throw "Channel registry key not found: $rp"
-  }
+  if (-not (Test-Path -LiteralPath $rp)) { throw "Channel registry key not found: $rp" }
 
   $enabled = (Get-ItemProperty -LiteralPath $rp -Name Enabled -ErrorAction Stop).Enabled
   if ($enabled -ne 1) {
     Log "Registry shows Enabled=$enabled. Forcing Enabled=1."
     Set-ItemProperty -LiteralPath $rp -Name Enabled -Value 1 -Type DWord -ErrorAction Stop
-    [void](Run "wevtutil.exe" @("sl", $Channel, "/e:true"))
+    [void](Run-Native $wevt @("sl", "`"$Channel`"", "/e:true"))
   }
 
   $enabled2 = (Get-ItemProperty -LiteralPath $rp -Name Enabled -ErrorAction Stop).Enabled
@@ -147,7 +174,6 @@ function Write-Log([string]$Msg) {
   Add-Content -Path $LogFile -Value "[$ts] $Msg" -Encoding UTF8
 }
 
-# Prevent concurrent runs
 $mutexName = "Global\RDP-AutoLogoff-Disconnected"
 $created = $false
 $mutex = New-Object System.Threading.Mutex($false, $mutexName, [ref]$created)
@@ -158,7 +184,6 @@ try {
   if (-not $lines) { Write-Log "qwinsta returned no output."; exit 0 }
 
   foreach ($line in $lines) {
-    # Some systems show Disc, some show Disconnected
     if ($line -match "^\s*>?\s*(?<sess>rdp-tcp#?\d*)\s+(?<user>\S*)\s+(?<id>\d+)\s+(?<state>(Disc|Disconnected))\b") {
       $id = [int]$Matches.id
       $user = $Matches.user
@@ -177,30 +202,27 @@ finally {
 '@
 
 # -----------------------------
-# Fallback enforcer for IEX installs (downloads SelfUrl on boot)
+# Minimal enforcer for IEX installs
 # -----------------------------
 function Get-MinimalEnforcer([string]$url) {
 @"
 param([ValidateSet('Install','Check','Uninstall')][string]\$Mode='Install',[string]\$SelfUrl='$url')
 Set-StrictMode -Version 2.0
 \$ErrorActionPreference='Stop'
-try {
-  \$src = Invoke-RestMethod -UseBasicParsing -Uri \$SelfUrl
-} catch {
-  \$src = Invoke-RestMethod -Uri \$SelfUrl
-}
+try { \$src = Invoke-RestMethod -UseBasicParsing -Uri \$SelfUrl } catch { \$src = Invoke-RestMethod -Uri \$SelfUrl }
 \$sb  = [ScriptBlock]::Create([string]\$src)
 & \$sb -Mode \$Mode -SelfUrl \$SelfUrl
 "@
 }
 
 # -----------------------------
-# Task XML parsing helpers (robust self-check)
+# Task XML parsing helpers
 # -----------------------------
 function Get-TaskXmlText([string]$name) {
-  $r = Run "schtasks.exe" @("/Query", "/TN", $name, "/XML")
+  $scht = Get-SystemExePath "schtasks.exe"
+  $r = Run-Native $scht @("/Query", "/TN", "`"$name`"", "/XML")
   if ($r.ExitCode -ne 0) { return "" }
-  $r.Output
+  $r.StdOut
 }
 
 function Get-TaskArgumentString([string]$xmlText) {
@@ -231,17 +253,14 @@ function Task-SelfCheck {
 
   $tx = Get-TaskXmlText $TaskEventName
   if ([string]::IsNullOrWhiteSpace($tx)) { throw "Missing task: $TaskEventName" }
-
   $args = Get-TaskArgumentString $tx
   if ($args -notmatch 'AutoLogoff-DisconnectedRdp\.ps1') { throw "TaskEvent action does not reference payload script name." }
-
   $sub = Get-TaskEventSubscription $tx
   if ($sub -notmatch 'EventID=24') { throw "TaskEvent trigger is not EventID 24." }
   if ($sub -notmatch [Regex]::Escape($Channel)) { throw "TaskEvent trigger does not reference expected channel." }
 
   $bx = Get-TaskXmlText $TaskBootName
   if ([string]::IsNullOrWhiteSpace($bx)) { throw "Missing task: $TaskBootName" }
-
   $bargs = Get-TaskArgumentString $bx
   if ($bargs -notmatch [Regex]::Escape($EnforcerPath)) { throw "Boot task does not call enforcer path." }
 
@@ -249,16 +268,20 @@ function Task-SelfCheck {
 }
 
 # -----------------------------
-# Task creation (use XML files for reliability)
+# Task creation via XML
 # -----------------------------
 function Write-XmlUtf16([string]$path, [string]$xml) {
   [IO.File]::WriteAllText($path, $xml, [Text.Encoding]::Unicode)
 }
 
 function Register-TaskFromXml([string]$name, [string]$xmlPath) {
-  [void](Run "schtasks.exe" @("/Delete","/TN",$name,"/F"))
-  $r = Run "schtasks.exe" @("/Create","/F","/TN",$name,"/XML",$xmlPath)
-  if ($r.ExitCode -ne 0) { throw "Failed to create task '$name': $($r.Output)" }
+  if (-not (Test-Path -LiteralPath $xmlPath)) { throw "XML not found: $xmlPath" }
+
+  $scht = Get-SystemExePath "schtasks.exe"
+  $r = Run-Native $scht @("/Create","/F","/TN", "`"$name`"", "/XML", "`"$xmlPath`"")
+  if ($r.ExitCode -ne 0) {
+    throw "Failed to create task '$name'. STDERR: $($r.StdErr.Trim()) STDOUT: $($r.StdOut.Trim())"
+  }
   Log "Task registered: $name"
 }
 
@@ -266,7 +289,7 @@ function Build-EventTaskXml {
   $sub = "<QueryList><Query Id=`"0`" Path=`"$Channel`"><Select Path=`"$Channel`">*[System[(EventID=24)]]</Select></Query></QueryList>"
   $args = "-NoProfile -ExecutionPolicy Bypass -File `"$PayloadPath`""
 
-  @"
+@"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
@@ -304,7 +327,7 @@ function Build-EventTaskXml {
 function Build-BootTaskXml {
   $args = "-NoProfile -ExecutionPolicy Bypass -File `"$EnforcerPath`" -Mode Install -SelfUrl `"$SelfUrl`""
 
-  @"
+@"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
@@ -343,8 +366,9 @@ function Build-BootTaskXml {
 # -----------------------------
 function Uninstall-All {
   Log "Uninstall starting..."
-  [void](Run "schtasks.exe" @("/Delete","/TN",$TaskEventName,"/F"))
-  [void](Run "schtasks.exe" @("/Delete","/TN",$TaskBootName,"/F"))
+  $scht = Get-SystemExePath "schtasks.exe"
+  [void](Run-Native $scht @("/Delete","/TN","`"$TaskEventName`"","/F"))
+  [void](Run-Native $scht @("/Delete","/TN","`"$TaskBootName`"","/F"))
 
   foreach ($p in @(
     $PayloadPath,
@@ -389,7 +413,7 @@ switch ($Mode) {
     Ensure-ChannelEnabled
     Write-FileIfDifferent -path $PayloadPath -content $PayloadContent
 
-    # Persist enforcer (prefer self-copy when running from file; fallback to minimal downloader for IEX)
+    # Persist enforcer (prefer self-copy; fallback to minimal downloader for IEX)
     if ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath)) {
       $self = Get-Content -LiteralPath $PSCommandPath -Raw -Encoding UTF8
       Write-FileIfDifferent -path $EnforcerPath -content $self
@@ -403,10 +427,14 @@ switch ($Mode) {
     # Write task XMLs
     $eventXmlPath = Join-Path $BaseDir 'Task-Event.xml'
     $bootXmlPath  = Join-Path $BaseDir 'Task-Boot.xml'
+
+    Log "Writing task XML: $eventXmlPath"
     Write-XmlUtf16 -path $eventXmlPath -xml (Build-EventTaskXml)
+
+    Log "Writing task XML: $bootXmlPath"
     Write-XmlUtf16 -path $bootXmlPath  -xml (Build-BootTaskXml)
 
-    # Register tasks
+    # Register tasks (NO delete first)
     Register-TaskFromXml -name $TaskEventName -xmlPath $eventXmlPath
     Register-TaskFromXml -name $TaskBootName  -xmlPath $bootXmlPath
 
