@@ -1,13 +1,16 @@
 <#
-  RDP-AutoLogoff-FullAuto.ps1  (PowerShell 5.1-safe)
-  Version: 1.0.4
+  RDP AutoLogoff (Immediate logoff on RDP disconnect)
+  Version: 1.1.0
   Author : Shourav | GitHub: github.com/rhshourav
 
-  Fully automated:
-    - Enables LocalSessionManager/Operational channel (registry verified)
-    - Installs ONEVENT task (EventID 24) -> payload logs off disconnected RDP sessions
-    - Installs ONSTART task -> re-enforces at every boot (downloads this script from GitHub URL)
-    - Self-checks using task XML (non-localized)
+  What it does:
+    - Enables: Microsoft-Windows-TerminalServices-LocalSessionManager/Operational (registry-verified)
+    - Writes payload:  C:\ProgramData\RDP-AutoLogoff\AutoLogoff-DisconnectedRdp.ps1
+    - Writes enforcer: C:\ProgramData\RDP-AutoLogoff\Enforce.ps1
+    - Creates tasks:
+        1) ONEVENT (EventID 24 disconnect) -> runs payload immediately
+        2) ONSTART -> runs enforcer each boot (re-enforces + self-check)
+    - Self-check parses task XML (robust; no fragile string matching)
 #>
 
 [CmdletBinding()]
@@ -15,36 +18,36 @@ param(
   [ValidateSet('Install','Check','Uninstall')]
   [string]$Mode = 'Install',
 
-  # IMPORTANT: set this to the exact raw URL of THIS script in your repo
-  [string]$SelfUrl = "https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/AutoLogoff/RDP-AutoLogoff-FullAuto.ps1",
-
-  [string]$BaseDir = "$env:ProgramData\RDP-AutoLogoff",
-  [string]$TaskEventName   = "RDP AutoLogoff on Disconnect",
-  [string]$TaskEnforceName = "RDP AutoLogoff Enforce"
+  # Optional fallback for IEX installs (if script path not available)
+  [string]$SelfUrl = "https://raw.githubusercontent.com/rhshourav/RDPWrap/refs/heads/main/AutoLogoff/RDP-AutoLogoff-FullAuto.ps1"
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$ScriptVersion = '1.0.4'
-$Author        = 'Shourav | GitHub: github.com/rhshourav'
+$Version = '1.1.0'
+$Author  = 'Shourav | GitHub: github.com/rhshourav'
 
 # -----------------------------
-# Constants / Paths
+# Config
 # -----------------------------
-$Channel      = 'Microsoft-Windows-TerminalServices-LocalSessionManager/Operational'
-$PayloadPath  = Join-Path $BaseDir 'AutoLogoff-DisconnectedRdp.ps1'
-$RunnerPath   = Join-Path $BaseDir 'Run-Enforce.ps1'
-$LogPath      = Join-Path $BaseDir 'Install.log'
+$BaseDir        = Join-Path $env:ProgramData 'RDP-AutoLogoff'
+$Channel        = 'Microsoft-Windows-TerminalServices-LocalSessionManager/Operational'
+$PayloadPath    = Join-Path $BaseDir 'AutoLogoff-DisconnectedRdp.ps1'
+$EnforcerPath   = Join-Path $BaseDir 'Enforce.ps1'
+$LogPath        = Join-Path $BaseDir 'Install.log'
+
+$TaskEventName  = 'RDP AutoLogoff on Disconnect'
+$TaskBootName   = 'RDP AutoLogoff Enforce'
 
 function Ensure-Dir([string]$p) {
   if (-not (Test-Path -LiteralPath $p)) {
     New-Item -ItemType Directory -Path $p -Force | Out-Null
   }
 }
-Ensure-Dir $BaseDir
 
 function Log([string]$msg) {
+  Ensure-Dir $BaseDir
   $ts = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
   $line = "[$ts] $msg"
   Add-Content -Path $LogPath -Value $line -Encoding UTF8
@@ -56,23 +59,12 @@ function Is-Admin {
   $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-function Run-Exe([string]$file, [string]$args) {
-  $psi = New-Object System.Diagnostics.ProcessStartInfo
-  $psi.FileName = $file
-  $psi.Arguments = $args
-  $psi.UseShellExecute = $false
-  $psi.RedirectStandardOutput = $true
-  $psi.RedirectStandardError  = $true
-  $psi.CreateNoWindow = $true
-
-  $p = New-Object System.Diagnostics.Process
-  $p.StartInfo = $psi
-  [void]$p.Start()
-  $out = $p.StandardOutput.ReadToEnd()
-  $err = $p.StandardError.ReadToEnd()
-  $p.WaitForExit()
-
-  [pscustomobject]@{ ExitCode=$p.ExitCode; StdOut=$out; StdErr=$err }
+function Run([string]$exe, [string[]]$args) {
+  $out = & $exe @args 2>&1
+  [pscustomobject]@{
+    ExitCode = $LASTEXITCODE
+    Output   = ($out | Out-String)
+  }
 }
 
 function Hash-StringSha256([string]$s) {
@@ -87,10 +79,10 @@ function Get-Sha256([string]$path) {
 }
 
 function Write-FileIfDifferent([string]$path, [string]$content) {
-  $expectedHash = Hash-StringSha256 $content
-  $currentHash  = Get-Sha256 $path
+  $expected = Hash-StringSha256 $content
+  $current  = Get-Sha256 $path
 
-  if ($currentHash -ne $expectedHash) {
+  if ($current -ne $expected) {
     Log "Writing/Updating: $path"
     $tmp = Join-Path $BaseDir ("tmp_" + [guid]::NewGuid().ToString('N') + ".tmp")
     [IO.File]::WriteAllText($tmp, $content, (New-Object Text.UTF8Encoding($false)))
@@ -101,16 +93,16 @@ function Write-FileIfDifferent([string]$path, [string]$content) {
 }
 
 # -----------------------------
-# Channel enable + check (registry, non-localized)
+# Channel enable/check (registry; non-localized)
 # -----------------------------
 function Get-ChannelRegPath {
   "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT\Channels\$Channel"
 }
 
 function Ensure-ChannelEnabled {
-  $r = Run-Exe "wevtutil.exe" ("sl `"$Channel`" /e:true")
+  $r = Run "wevtutil.exe" @("sl", $Channel, "/e:true")
   if ($r.ExitCode -ne 0) {
-    throw "wevtutil enable failed. exit=$($r.ExitCode) err=$($r.StdErr)"
+    throw "wevtutil enable failed: $($r.Output)"
   }
 
   $rp = Get-ChannelRegPath
@@ -120,9 +112,9 @@ function Ensure-ChannelEnabled {
 
   $enabled = (Get-ItemProperty -LiteralPath $rp -Name Enabled -ErrorAction Stop).Enabled
   if ($enabled -ne 1) {
-    Log "Registry Enabled=$enabled. Forcing Enabled=1."
+    Log "Registry shows Enabled=$enabled. Forcing Enabled=1."
     Set-ItemProperty -LiteralPath $rp -Name Enabled -Value 1 -Type DWord -ErrorAction Stop
-    [void](Run-Exe "wevtutil.exe" ("sl `"$Channel`" /e:true"))
+    [void](Run "wevtutil.exe" @("sl", $Channel, "/e:true"))
   }
 
   $enabled2 = (Get-ItemProperty -LiteralPath $rp -Name Enabled -ErrorAction Stop).Enabled
@@ -140,128 +132,252 @@ function Check-ChannelEnabled {
 }
 
 # -----------------------------
-# Payload (runs on disconnect event)
+# Payload script (runs on disconnect)
 # -----------------------------
-$PayloadContent =
-"Set-StrictMode -Version 2.0`r`n" +
-'$ErrorActionPreference = "SilentlyContinue"' + "`r`n`r`n" +
-'$BaseDir = Join-Path $env:ProgramData "RDP-AutoLogoff"' + "`r`n" +
-'$LogFile = Join-Path $BaseDir "AutoLogoff.log"' + "`r`n" +
-'New-Item -ItemType Directory -Path $BaseDir -Force | Out-Null' + "`r`n`r`n" +
-'function Write-Log([string]$Msg) {' + "`r`n" +
-'  $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")' + "`r`n" +
-'  Add-Content -Path $LogFile -Value "[$ts] $Msg" -Encoding UTF8' + "`r`n" +
-'}' + "`r`n`r`n" +
-'$mutexName = "Global\RDP-AutoLogoff-Disconnected"' + "`r`n" +
-'$created = $false' + "`r`n" +
-'$mutex = New-Object System.Threading.Mutex($false, $mutexName, [ref]$created)' + "`r`n" +
-'if (-not $mutex.WaitOne(0)) { exit 0 }' + "`r`n`r`n" +
-'try {' + "`r`n" +
-'  $lines = & qwinsta 2>$null' + "`r`n" +
-'  if (-not $lines) { Write-Log "qwinsta returned no output."; exit 0 }' + "`r`n`r`n" +
-'  foreach ($line in $lines) {' + "`r`n" +
-'    if ($line -match "^\s*>?\s*(?<sess>rdp-tcp#?\d*)\s+(?<user>\S*)\s+(?<id>\d+)\s+(?<state>Disc)\b") {' + "`r`n" +
-'      $id = [int]$Matches.id' + "`r`n" +
-'      $user = $Matches.user' + "`r`n" +
-'      Write-Log "Logging off disconnected RDP session: ID=$id USER=$user LINE=''$line''"' + "`r`n" +
-'      & logoff $id /V 2>$null' + "`r`n" +
-'    }' + "`r`n" +
-'  }' + "`r`n" +
-'} catch {' + "`r`n" +
-'  Write-Log ("ERROR: " + $_.Exception.Message)' + "`r`n" +
-'} finally {' + "`r`n" +
-'  try { $mutex.ReleaseMutex() | Out-Null } catch {}' + "`r`n" +
-'  $mutex.Dispose()' + "`r`n" +
-'}' + "`r`n"
+$PayloadContent = @'
+Set-StrictMode -Version 2.0
+$ErrorActionPreference = "SilentlyContinue"
 
-# -----------------------------
-# Runner (called at boot to re-enforce)
-# -----------------------------
-$RunnerContent =
-"param([Parameter(Mandatory=`$true)][string]`$Url)`r`n" +
-"Set-StrictMode -Version 2.0`r`n" +
-"`$ErrorActionPreference = 'Stop'`r`n" +
-"function Get-RemoteText([string]`$u){`r`n" +
-"  try { return (Invoke-RestMethod -UseBasicParsing -Uri `$u) } catch { return (Invoke-RestMethod -Uri `$u) }`r`n" +
-"}`r`n" +
-"`$src = Get-RemoteText `$Url`r`n" +
-"`$sb = [ScriptBlock]::Create([string]`$src)`r`n" +
-"& `$sb -Mode Install -SelfUrl `$Url`r`n"
+$BaseDir = Join-Path $env:ProgramData "RDP-AutoLogoff"
+$LogFile = Join-Path $BaseDir "AutoLogoff.log"
+New-Item -ItemType Directory -Path $BaseDir -Force | Out-Null
 
-# -----------------------------
-# Task helpers (use XML for verification)
-# -----------------------------
-function Get-TaskXml([string]$name) {
-  $r = Run-Exe "schtasks.exe" ("/Query /TN `"$name`" /XML")
-  if ($r.ExitCode -ne 0) { return "" }
-  $r.StdOut
+function Write-Log([string]$Msg) {
+  $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+  Add-Content -Path $LogFile -Value "[$ts] $Msg" -Encoding UTF8
 }
 
-function Create-OrUpdate-TaskEvent {
-  $trigger = "*[System[(EventID=24)]]"
-  $tr = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PayloadPath`""
-  $cmd = "/Create /F /TN `"$TaskEventName`" /SC ONEVENT /EC `"$Channel`" /MO `"$trigger`" /TR `"$tr`" /RU SYSTEM /RL HIGHEST"
-  $r = Run-Exe "schtasks.exe" $cmd
-  if ($r.ExitCode -ne 0) { throw "Failed ONEVENT task. exit=$($r.ExitCode) err=$($r.StdErr)" }
-  Log "Task OK: $TaskEventName"
-}
+# Prevent concurrent runs
+$mutexName = "Global\RDP-AutoLogoff-Disconnected"
+$created = $false
+$mutex = New-Object System.Threading.Mutex($false, $mutexName, [ref]$created)
+if (-not $mutex.WaitOne(0)) { exit 0 }
 
-function Create-OrUpdate-TaskEnforce {
-  $tr = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$RunnerPath`" -Url `"$SelfUrl`""
-  $cmd = "/Create /F /TN `"$TaskEnforceName`" /SC ONSTART /TR `"$tr`" /RU SYSTEM /RL HIGHEST"
-  $r = Run-Exe "schtasks.exe" $cmd
-  if ($r.ExitCode -ne 0) { throw "Failed ONSTART task. exit=$($r.ExitCode) err=$($r.StdErr)" }
-  Log "Task OK: $TaskEnforceName"
-}
+try {
+  $lines = & qwinsta 2>$null
+  if (-not $lines) { Write-Log "qwinsta returned no output."; exit 0 }
 
-function SelfCheck-Tasks {
-  $x1 = Get-TaskXml $TaskEventName
-  if ([string]::IsNullOrWhiteSpace($x1)) { throw "Task missing: $TaskEventName" }
-  if ($x1 -notmatch [Regex]::Escape($PayloadPath)) { throw "TaskEvent does not reference payload path." }
-  if ($x1 -notmatch [Regex]::Escape($Channel))     { throw "TaskEvent does not reference channel." }
-  if ($x1 -notmatch "EventID=24")                  { throw "TaskEvent does not contain EventID 24 filter." }
-
-  $x2 = Get-TaskXml $TaskEnforceName
-  if ([string]::IsNullOrWhiteSpace($x2)) { throw "Task missing: $TaskEnforceName" }
-  if ($x2 -notmatch [Regex]::Escape($RunnerPath))  { throw "TaskEnforce does not reference RunnerPath." }
-  if ($x2 -notmatch [Regex]::Escape($SelfUrl))     { throw "TaskEnforce does not reference SelfUrl." }
-
-  Log "Task self-check OK (XML)."
-}
-
-function Uninstall-All {
-  Log "Uninstall starting..."
-  [void](Run-Exe "schtasks.exe" ("/Delete /TN `"$TaskEventName`" /F"))
-  [void](Run-Exe "schtasks.exe" ("/Delete /TN `"$TaskEnforceName`" /F"))
-
-  foreach ($p in @($PayloadPath,$RunnerPath,(Join-Path $BaseDir 'AutoLogoff.log'))) {
-    if (Test-Path -LiteralPath $p) {
-      Remove-Item -LiteralPath $p -Force
-      Log "Removed: $p"
+  foreach ($line in $lines) {
+    # Some systems show Disc, some show Disconnected
+    if ($line -match "^\s*>?\s*(?<sess>rdp-tcp#?\d*)\s+(?<user>\S*)\s+(?<id>\d+)\s+(?<state>(Disc|Disconnected))\b") {
+      $id = [int]$Matches.id
+      $user = $Matches.user
+      Write-Log "Logging off disconnected RDP session: ID=$id USER=$user LINE='$line'"
+      & logoff $id /V 2>$null
     }
   }
+}
+catch {
+  Write-Log ("ERROR: " + $_.Exception.Message)
+}
+finally {
+  try { $mutex.ReleaseMutex() | Out-Null } catch {}
+  $mutex.Dispose()
+}
+'@
+
+# -----------------------------
+# Fallback enforcer for IEX installs (downloads SelfUrl on boot)
+# -----------------------------
+function Get-MinimalEnforcer([string]$url) {
+@"
+param([ValidateSet('Install','Check','Uninstall')][string]\$Mode='Install',[string]\$SelfUrl='$url')
+Set-StrictMode -Version 2.0
+\$ErrorActionPreference='Stop'
+try {
+  \$src = Invoke-RestMethod -UseBasicParsing -Uri \$SelfUrl
+} catch {
+  \$src = Invoke-RestMethod -Uri \$SelfUrl
+}
+\$sb  = [ScriptBlock]::Create([string]\$src)
+& \$sb -Mode \$Mode -SelfUrl \$SelfUrl
+"@
+}
+
+# -----------------------------
+# Task XML parsing helpers (robust self-check)
+# -----------------------------
+function Get-TaskXmlText([string]$name) {
+  $r = Run "schtasks.exe" @("/Query", "/TN", $name, "/XML")
+  if ($r.ExitCode -ne 0) { return "" }
+  $r.Output
+}
+
+function Get-TaskArgumentString([string]$xmlText) {
+  if ([string]::IsNullOrWhiteSpace($xmlText)) { return "" }
+  [xml]$x = $xmlText
+  $ns = New-Object Xml.XmlNamespaceManager($x.NameTable)
+  $ns.AddNamespace('t','http://schemas.microsoft.com/windows/2004/02/mit/task')
+  $n = $x.SelectSingleNode('//t:Actions/t:Exec/t:Arguments', $ns)
+  if ($n -eq $null) { return "" }
+  $n.InnerText
+}
+
+function Get-TaskEventSubscription([string]$xmlText) {
+  if ([string]::IsNullOrWhiteSpace($xmlText)) { return "" }
+  [xml]$x = $xmlText
+  $ns = New-Object Xml.XmlNamespaceManager($x.NameTable)
+  $ns.AddNamespace('t','http://schemas.microsoft.com/windows/2004/02/mit/task')
+  $n = $x.SelectSingleNode('//t:Triggers/t:EventTrigger/t:Subscription', $ns)
+  if ($n -eq $null) { return "" }
+  $n.InnerText
+}
+
+function Task-SelfCheck {
+  Check-ChannelEnabled
+
+  if (-not (Test-Path -LiteralPath $PayloadPath))  { throw "Missing payload: $PayloadPath" }
+  if (-not (Test-Path -LiteralPath $EnforcerPath)) { throw "Missing enforcer: $EnforcerPath" }
+
+  $tx = Get-TaskXmlText $TaskEventName
+  if ([string]::IsNullOrWhiteSpace($tx)) { throw "Missing task: $TaskEventName" }
+
+  $args = Get-TaskArgumentString $tx
+  if ($args -notmatch 'AutoLogoff-DisconnectedRdp\.ps1') { throw "TaskEvent action does not reference payload script name." }
+
+  $sub = Get-TaskEventSubscription $tx
+  if ($sub -notmatch 'EventID=24') { throw "TaskEvent trigger is not EventID 24." }
+  if ($sub -notmatch [Regex]::Escape($Channel)) { throw "TaskEvent trigger does not reference expected channel." }
+
+  $bx = Get-TaskXmlText $TaskBootName
+  if ([string]::IsNullOrWhiteSpace($bx)) { throw "Missing task: $TaskBootName" }
+
+  $bargs = Get-TaskArgumentString $bx
+  if ($bargs -notmatch [Regex]::Escape($EnforcerPath)) { throw "Boot task does not call enforcer path." }
+
+  Log "Self-check OK."
+}
+
+# -----------------------------
+# Task creation (use XML files for reliability)
+# -----------------------------
+function Write-XmlUtf16([string]$path, [string]$xml) {
+  [IO.File]::WriteAllText($path, $xml, [Text.Encoding]::Unicode)
+}
+
+function Register-TaskFromXml([string]$name, [string]$xmlPath) {
+  [void](Run "schtasks.exe" @("/Delete","/TN",$name,"/F"))
+  $r = Run "schtasks.exe" @("/Create","/F","/TN",$name,"/XML",$xmlPath)
+  if ($r.ExitCode -ne 0) { throw "Failed to create task '$name': $($r.Output)" }
+  Log "Task registered: $name"
+}
+
+function Build-EventTaskXml {
+  $sub = "<QueryList><Query Id=`"0`" Path=`"$Channel`"><Select Path=`"$Channel`">*[System[(EventID=24)]]</Select></Query></QueryList>"
+  $args = "-NoProfile -ExecutionPolicy Bypass -File `"$PayloadPath`""
+
+  @"
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Author>Shourav</Author>
+    <Description>Immediate logoff on RDP disconnect (EventID 24).</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <EventTrigger>
+      <Enabled>true</Enabled>
+      <Subscription><![CDATA[$sub]]></Subscription>
+    </EventTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>S-1-5-18</UserId>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <Enabled>true</Enabled>
+    <ExecutionTimeLimit>PT1M</ExecutionTimeLimit>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>powershell.exe</Command>
+      <Arguments>$args</Arguments>
+    </Exec>
+  </Actions>
+</Task>
+"@
+}
+
+function Build-BootTaskXml {
+  $args = "-NoProfile -ExecutionPolicy Bypass -File `"$EnforcerPath`" -Mode Install -SelfUrl `"$SelfUrl`""
+
+  @"
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Author>Shourav</Author>
+    <Description>Re-enforce RDP AutoLogoff at boot.</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <BootTrigger>
+      <Enabled>true</Enabled>
+    </BootTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>S-1-5-18</UserId>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <Enabled>true</Enabled>
+    <ExecutionTimeLimit>PT2M</ExecutionTimeLimit>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>powershell.exe</Command>
+      <Arguments>$args</Arguments>
+    </Exec>
+  </Actions>
+</Task>
+"@
+}
+
+# -----------------------------
+# Uninstall
+# -----------------------------
+function Uninstall-All {
+  Log "Uninstall starting..."
+  [void](Run "schtasks.exe" @("/Delete","/TN",$TaskEventName,"/F"))
+  [void](Run "schtasks.exe" @("/Delete","/TN",$TaskBootName,"/F"))
+
+  foreach ($p in @(
+    $PayloadPath,
+    $EnforcerPath,
+    (Join-Path $BaseDir 'Task-Event.xml'),
+    (Join-Path $BaseDir 'Task-Boot.xml'),
+    (Join-Path $BaseDir 'AutoLogoff.log')
+  )) {
+    if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
+  }
+
   Log "Uninstall complete."
 }
 
 # -----------------------------
 # Banner
 # -----------------------------
+Ensure-Dir $BaseDir
 Log "======================================================================="
-Log " RDP AutoLogoff FullAuto  v$ScriptVersion"
+Log " RDP AutoLogoff FullAuto  v$Version"
 Log " Author: $Author"
 Log " Host  : $env:COMPUTERNAME"
 Log " User  : $env:USERNAME"
 Log " Mode  : $Mode"
-Log " SelfUrl: $SelfUrl"
 Log "======================================================================="
+
+if ($Mode -ne 'Check' -and $Mode -ne 'Uninstall') {
+  if (-not (Is-Admin)) { throw "Not elevated. Run PowerShell as Administrator." }
+}
 
 # -----------------------------
 # Main
 # -----------------------------
-if ($Mode -ne 'Check' -and $Mode -ne 'Uninstall') {
-  if (-not (Is-Admin)) { throw "Not elevated. Run PowerShell as Administrator (or run as SYSTEM)." }
-}
-
 switch ($Mode) {
   'Uninstall' {
     Uninstall-All
@@ -269,25 +385,40 @@ switch ($Mode) {
   }
 
   'Install' {
+    Ensure-Dir $BaseDir
     Ensure-ChannelEnabled
     Write-FileIfDifferent -path $PayloadPath -content $PayloadContent
-    Write-FileIfDifferent -path $RunnerPath  -content $RunnerContent
-    Create-OrUpdate-TaskEvent
-    Create-OrUpdate-TaskEnforce
 
-    # Self-checks
-    Check-ChannelEnabled
-    SelfCheck-Tasks
+    # Persist enforcer (prefer self-copy when running from file; fallback to minimal downloader for IEX)
+    if ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath)) {
+      $self = Get-Content -LiteralPath $PSCommandPath -Raw -Encoding UTF8
+      Write-FileIfDifferent -path $EnforcerPath -content $self
+      Log "Enforcer persisted from file path: $PSCommandPath"
+    } else {
+      $min = Get-MinimalEnforcer $SelfUrl
+      Write-FileIfDifferent -path $EnforcerPath -content $min
+      Log "Enforcer persisted as minimal downloader (IEX-safe)."
+    }
+
+    # Write task XMLs
+    $eventXmlPath = Join-Path $BaseDir 'Task-Event.xml'
+    $bootXmlPath  = Join-Path $BaseDir 'Task-Boot.xml'
+    Write-XmlUtf16 -path $eventXmlPath -xml (Build-EventTaskXml)
+    Write-XmlUtf16 -path $bootXmlPath  -xml (Build-BootTaskXml)
+
+    # Register tasks
+    Register-TaskFromXml -name $TaskEventName -xmlPath $eventXmlPath
+    Register-TaskFromXml -name $TaskBootName  -xmlPath $bootXmlPath
+
+    # Self-check
+    Task-SelfCheck
 
     Log "INSTALL/ENFORCE OK."
     break
   }
 
   'Check' {
-    Check-ChannelEnabled
-    if (-not (Test-Path -LiteralPath $PayloadPath)) { throw "Missing payload: $PayloadPath" }
-    if (-not (Test-Path -LiteralPath $RunnerPath))  { throw "Missing runner: $RunnerPath" }
-    SelfCheck-Tasks
+    Task-SelfCheck
     Log "CHECK OK."
     break
   }
