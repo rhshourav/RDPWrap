@@ -1,6 +1,6 @@
 <#
   RDP AutoLogoff (Immediate logoff on RDP disconnect)
-  Version: 1.1.2
+  Version: 1.1.3
   Author : Shourav | GitHub: github.com/rhshourav
 
   What it does:
@@ -11,11 +11,6 @@
         1) ONEVENT (EventID 24 disconnect) -> runs payload immediately
         2) ONSTART -> runs enforcer each boot (re-enforces + self-check)
     - Self-check parses task XML (robust; no fragile string matching)
-
-  Run:
-    Install   : powershell -ExecutionPolicy Bypass -File .\test.ps1
-    Check     : powershell -ExecutionPolicy Bypass -File .\test.ps1 -Mode Check
-    Uninstall : powershell -ExecutionPolicy Bypass -File .\test.ps1 -Mode Uninstall
 #>
 
 [CmdletBinding()]
@@ -30,7 +25,7 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$Version = '1.1.2'
+$Version = '1.1.3'
 $Author  = 'Shourav | GitHub: github.com/rhshourav'
 
 # -----------------------------
@@ -66,14 +61,13 @@ function Is-Admin {
 
 function Get-SystemExePath([string]$name) {
   $sys = Join-Path $env:windir "System32\$name"
-  $sn  = Join-Path $env:windir "Sysnative\$name"  # only works from 32-bit process on 64-bit OS
+  $sn  = Join-Path $env:windir "Sysnative\$name"
   if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess -and (Test-Path -LiteralPath $sn)) {
     return $sn
   }
   return $sys
 }
 
-# Robust native exec (no PowerShell native stderr weirdness)
 function Run-Native([string]$ExePath, [string[]]$Arguments) {
   $psi = New-Object System.Diagnostics.ProcessStartInfo
   $psi.FileName = $ExePath
@@ -202,17 +196,25 @@ finally {
 '@
 
 # -----------------------------
-# Minimal enforcer for IEX installs
+# FIXED: Minimal enforcer for IEX installs (NO interpolation, no StrictMode failures)
 # -----------------------------
 function Get-MinimalEnforcer([string]$url) {
-@"
-param([ValidateSet('Install','Check','Uninstall')][string]\$Mode='Install',[string]\$SelfUrl='$url')
+  $u = $url.Replace("'", "''")  # safe for single-quoted string literal
+  $tpl = @'
+param([ValidateSet('Install','Check','Uninstall')][string]$Mode='Install',[string]$SelfUrl='__URL__')
 Set-StrictMode -Version 2.0
-\$ErrorActionPreference='Stop'
-try { \$src = Invoke-RestMethod -UseBasicParsing -Uri \$SelfUrl } catch { \$src = Invoke-RestMethod -Uri \$SelfUrl }
-\$sb  = [ScriptBlock]::Create([string]\$src)
-& \$sb -Mode \$Mode -SelfUrl \$SelfUrl
-"@
+$ErrorActionPreference='Stop'
+
+try {
+  $src = Invoke-RestMethod -UseBasicParsing -Uri $SelfUrl
+} catch {
+  $src = Invoke-RestMethod -Uri $SelfUrl
+}
+
+$sb  = [ScriptBlock]::Create([string]$src)
+& $sb -Mode $Mode -SelfUrl $SelfUrl
+'@
+  return $tpl.Replace('__URL__', $u)
 }
 
 # -----------------------------
@@ -361,9 +363,6 @@ function Build-BootTaskXml {
 "@
 }
 
-# -----------------------------
-# Uninstall
-# -----------------------------
 function Uninstall-All {
   Log "Uninstall starting..."
   $scht = Get-SystemExePath "schtasks.exe"
@@ -424,23 +423,16 @@ switch ($Mode) {
       Log "Enforcer persisted as minimal downloader (IEX-safe)."
     }
 
-    # Write task XMLs
     $eventXmlPath = Join-Path $BaseDir 'Task-Event.xml'
     $bootXmlPath  = Join-Path $BaseDir 'Task-Boot.xml'
 
-    Log "Writing task XML: $eventXmlPath"
     Write-XmlUtf16 -path $eventXmlPath -xml (Build-EventTaskXml)
-
-    Log "Writing task XML: $bootXmlPath"
     Write-XmlUtf16 -path $bootXmlPath  -xml (Build-BootTaskXml)
 
-    # Register tasks (NO delete first)
     Register-TaskFromXml -name $TaskEventName -xmlPath $eventXmlPath
     Register-TaskFromXml -name $TaskBootName  -xmlPath $bootXmlPath
 
-    # Self-check
     Task-SelfCheck
-
     Log "INSTALL/ENFORCE OK."
     break
   }
